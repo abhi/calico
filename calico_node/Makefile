@@ -34,9 +34,7 @@ V_CONFD := $(shell cat $(VERSIONS_FILE) | $(YAML_CMD) read - '"$(RELEASE_STREAM)
 V_CALICOCTL := $(shell cat $(VERSIONS_FILE) | $(YAML_CMD) read - '"$(RELEASE_STREAM)".[0].components.calicoctl.version')
 V_CNI := $(shell cat $(VERSIONS_FILE) | $(YAML_CMD) read - '"$(RELEASE_STREAM)".[0].components.calico/cni.version')
 V_FELIX := $(shell cat $(VERSIONS_FILE) | $(YAML_CMD) read - '"$(RELEASE_STREAM)".[0].components.felix.version')
-V_GOBGPD := $(shell cat $(VERSIONS_FILE) | $(YAML_CMD) read - '"$(RELEASE_STREAM)".[0].components.calico-bgp-daemon.version')
 V_KUBE_CONTROLLERS := $(shell cat $(VERSIONS_FILE) | $(YAML_CMD) read - '"$(RELEASE_STREAM)".[0].components.calico/kube-controllers.version')
-V_LIBNETWORK_PLUGIN := $(shell cat $(VERSIONS_FILE) | $(YAML_CMD) read - '"$(RELEASE_STREAM)".[0].components.libnetwork-plugin.version')
 V_TYPHA := $(shell cat $(VERSIONS_FILE) | $(YAML_CMD) read - '"$(RELEASE_STREAM)".[0].components.typha.version')
 V_RR := $(shell cat $(VERSIONS_FILE) | $(YAML_CMD) read - '"$(RELEASE_STREAM)".[0].components.calico/routereflector.version')
 
@@ -49,9 +47,7 @@ CONFD_VER ?= $(V_CONFD)
 CALICOCTL_VER ?= $(V_CALICOCTL)
 CNI_VER ?= $(V_CNI)
 FELIX_VER ?= $(V_FELIX)
-GOBGPD_VER ?= $(V_GOBGPD)
 KUBE_CONTROLLERS_VER ?= $(V_KUBE_CONTROLLERS)
-LIBNETWORK_PLUGIN_VER ?= $(V_LIBNETWORK_PLUGIN)
 TYPHA_VER ?= $(V_TYPHA)
 RR_VER ?= $(V_RR)
 
@@ -62,9 +58,7 @@ $(info $(shell printf "%-21s = %-10s\n" "CONFD_VER" $(CONFD_VER)))
 $(info $(shell printf "%-21s = %-10s\n" "CALICOCTL_VER" $(CALICOCTL_VER)))
 $(info $(shell printf "%-21s = %-10s\n" "CNI_VER" $(CNI_VER)))
 $(info $(shell printf "%-21s = %-10s\n" "FELIX_VER" $(FELIX_VER)))
-$(info $(shell printf "%-21s = %-10s\n" "GOBGPD_VER" $(GOBGPD_VER)))
 $(info $(shell printf "%-21s = %-10s\n" "KUBE_CONTROLLERS_VER" $(KUBE_CONTROLLERS_VER)))
-$(info $(shell printf "%-21s = %-10s\n" "LIBNETWORK_PLUGIN_VER" $(LIBNETWORK_PLUGIN_VER)))
 $(info $(shell printf "%-21s = %-10s\n" "TYPHA_VER" $(TYPHA_VER)))
 $(info $(shell printf "%-21s = %-10s\n" "RR_VER" $(RR_VER)))
 
@@ -84,7 +78,6 @@ MAKE_SURE_BIN_EXIST := $(shell mkdir -p dist)
 BIRD_URL?=https://github.com/projectcalico/calico-bird/releases/download/$(BIRD_VER)/bird
 BIRD6_URL?=https://github.com/projectcalico/calico-bird/releases/download/$(BIRD_VER)/bird6
 BIRDCL_URL?=https://github.com/projectcalico/calico-bird/releases/download/$(BIRD_VER)/birdcl
-CALICO_BGP_DAEMON_URL?=https://github.com/projectcalico/calico-bgp-daemon/releases/download/$(GOBGPD_VER)/calico-bgp-daemon
 
 ###############################################################################
 # calico/node build. Contains the following areas
@@ -96,14 +89,12 @@ NODE_CONTAINER_NAME?=calico/node$(ARCHTAG)
 NODE_CONTAINER_FILES=$(shell find $(NODE_CONTAINER_DIR)/filesystem -type f)
 NODE_CONTAINER_CREATED=$(NODE_CONTAINER_DIR)/.calico_node.created
 NODE_CONTAINER_BIN_DIR=$(NODE_CONTAINER_DIR)/filesystem/bin
-NODE_CONTAINER_BINARIES=startup allocate-ipip-addr calico-felix bird calico-bgp-daemon confd libnetwork-plugin
+NODE_CONTAINER_BINARIES=startup allocate-ipip-addr calico-felix bird confd 
 
 FELIX_REPO?=calico/felix
 FELIX_CONTAINER_NAME?=$(FELIX_REPO)$(ARCHTAG):$(FELIX_VER)
 CONFD_REPO?=calico/confd
 CONFD_CONTAINER_NAME?=$(CONFD_REPO)$(ARCHTAG):$(CONFD_VER)
-LIBNETWORK_PLUGIN_REPO?=calico/libnetwork-plugin
-LIBNETWORK_PLUGIN_CONTAINER_NAME?=$(LIBNETWORK_PLUGIN_REPO)$(ARCHTAG):$(LIBNETWORK_PLUGIN_VER)
 CTL_CONTAINER_NAME?=calico/ctl$(ARCHTAG):$(CALICOCTL_VER)
 
 RR_CONTAINER_NAME?=calico/routereflector$(ARCHTAG)
@@ -188,9 +179,7 @@ calico-node.tar: $(NODE_CONTAINER_CREATED)
 	docker run --rm $(NODE_CONTAINER_NAME) /bin/sh -c "\
 	  echo calico-felix --version; /bin/calico-felix --version; \
 	  echo bird --version;         /bin/bird --version; \
-	  echo calico-bgp-daemon -v;   /bin/calico-bgp-daemon -v; \
 	  echo confd --version;        /bin/confd --version; \
-	  echo libnetwork-plugin -v;   /bin/libnetwork-plugin -v; \
 	"
 	docker save --output $@ $(NODE_CONTAINER_NAME)
 
@@ -206,9 +195,7 @@ $(NODE_CONTAINER_CREATED): $(NODE_CONTAINER_DIR)/Dockerfile$(ARCHTAG) $(NODE_CON
 	# allocate-ipip-addr: doesn't support --version or -v
 	$(NODE_CONTAINER_BIN_DIR)/calico-felix --version
 	$(NODE_CONTAINER_BIN_DIR)/bird --version
-	$(NODE_CONTAINER_BIN_DIR)/calico-bgp-daemon -v
 	$(NODE_CONTAINER_BIN_DIR)/confd --version
-	$(NODE_CONTAINER_BIN_DIR)/libnetwork-plugin -v
 	docker build --pull -t $(NODE_CONTAINER_NAME) $(NODE_CONTAINER_DIR) -f $(NODE_CONTAINER_DIR)/Dockerfile$(ARCHTAG)
 	touch $@
 
@@ -228,16 +215,6 @@ $(NODE_CONTAINER_BIN_DIR)/calico-felix update-felix:
 	  touch $(NODE_CONTAINER_BIN_DIR)/calico-felix
 	-docker rm -f calico-felix
 
-# Get libnetwork-plugin binaries
-$(NODE_CONTAINER_BIN_DIR)/libnetwork-plugin:
-	-docker rm -f calico-$(@F)
-	# Latest libnetwork-plugin binaries are stored in automated builds of calico/libnetwork-plugin.
-	# To get them, we pull that image, then copy the binaries out to our host
-	docker pull $(LIBNETWORK_PLUGIN_CONTAINER_NAME)
-	docker create --name calico-$(@F) $(LIBNETWORK_PLUGIN_CONTAINER_NAME)
-	docker cp calico-$(@F):/$(@F) $(@D)
-	-docker rm -f calico-$(@F)
-
 # Get the confd binary
 $(NODE_CONTAINER_BIN_DIR)/confd:
 	-docker rm -f calico-confd
@@ -253,11 +230,6 @@ $(NODE_CONTAINER_BIN_DIR)/confd:
 	  touch $(NODE_CONTAINER_BIN_DIR)/confd
 	-docker rm -f calico-confd
 	chmod +x $@
-
-# Get the calico-bgp-daemon binary
-$(NODE_CONTAINER_BIN_DIR)/calico-bgp-daemon:
-	$(CURL) -L $(CALICO_BGP_DAEMON_URL) -o $@
-	chmod +x $(@D)/*
 
 # Get bird binaries
 $(NODE_CONTAINER_BIN_DIR)/bird:
@@ -571,7 +543,6 @@ node-test-containerized: vendor run-etcd-host run-k8s-apiserver
 ## Run calico/node docker-image acceptance tests
 node-test-at:
 	docker run -v $(CALICO_NODE_DIR)tests/at/calico_node_goss.yaml:/tmp/goss.yaml \
-        -e CALICO_BGP_DAEMON_VER=$(GOBGPD_VER) \
         -e CALICO_FELIX_VER=$(FELIX_VER) \
         -e CONFD_VER=$(CONFD_VER) \
 	calico/node:$(CALICO_VER) /bin/sh -c 'apk --no-cache add wget ca-certificates && \
@@ -620,7 +591,6 @@ release: clean
 
 	# Check that the images container the right sub-components
 	docker run $(NODE_CONTAINER_NAME) calico-felix --version
-	docker run $(NODE_CONTAINER_NAME) libnetwork-plugin -v
 
 	@echo "# See RELEASING.md for detailed instructions."
 	@echo "# Now push release images."
